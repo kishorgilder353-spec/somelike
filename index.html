@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>匿名信</title>
+<style>
+:root{--bg:#eef1f5;--card:rgba(255,255,255,.9);--fg:#1d2433;--sub:#6b7485;--line:#d5dae3;--ac:#1f6f78;--acfg:#fff}
+[data-theme=dark]{--bg:#12161d;--card:rgba(27,33,43,.9);--fg:#e6eaf0;--sub:#8e98a8;--line:#323a48;--ac:#5fb3bd;--acfg:#0d1a1c}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--fg);font:16px/1.6 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+#bg{position:fixed;inset:0;z-index:-1;background:center/cover no-repeat}
+#app{display:flex;flex-direction:column;height:100%;max-width:640px;margin:0 auto;padding-top:env(safe-area-inset-top)}
+header{display:flex;justify-content:space-between;align-items:center;padding:10px 14px}
+header h1{margin:0;font-size:20px}
+main{flex:1;overflow-y:auto;padding:0 14px 14px}
+nav{display:flex;gap:8px;padding:8px 14px calc(8px + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--line);backdrop-filter:blur(8px)}
+nav button{flex:1;padding:10px;font-size:16px;border:0;border-radius:8px;background:none;color:var(--sub)}
+nav button.on{background:var(--ac);color:var(--acfg);font-weight:600}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px;backdrop-filter:blur(6px)}
+.seg{display:flex;gap:6px;margin-bottom:12px}
+.seg button{flex:1;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--fg);font-size:15px}
+.seg button.on{background:var(--ac);color:var(--acfg);border-color:var(--ac)}
+input,textarea{width:100%;padding:10px;margin-bottom:10px;font:inherit;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
+.btn,.chip{padding:10px 14px;font:inherit;font-weight:600;border:0;border-radius:8px;background:var(--ac);color:var(--acfg)}
+.btn{width:100%}
+.chip{padding:6px 12px;font-size:14px}
+.ghost{background:none;color:var(--sub);border:1px solid var(--line);font-weight:400}
+.btn:disabled{opacity:.5}
+.meta{display:flex;justify-content:space-between;color:var(--sub);font-size:13px}
+.body{white-space:pre-wrap;word-break:break-word;margin:6px 0}
+.rep{background:none;border:0;color:var(--sub);font-size:13px;padding:0}
+.hint{color:var(--sub);font-size:13px;margin:0 0 10px}
+#gate{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg)}
+#gate .card{max-width:340px;text-align:center}
+#sheet,#chat{position:fixed;inset:0;z-index:15;background:rgba(0,0,0,.45);overflow-y:auto;padding:24px 14px}
+#sheet .card,#chat .card{max-width:480px;margin:0 auto}
+.bub{max-width:80%;padding:8px 12px;border-radius:12px;margin:6px 0;white-space:pre-wrap;word-break:break-word;background:var(--bg);border:1px solid var(--line)}
+.bub.me{margin-left:auto;background:var(--ac);color:var(--acfg);border-color:var(--ac)}
+#toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);max-width:86%;padding:10px 16px;border-radius:8px;background:#222;color:#fff;font-size:14px;z-index:30}
+h3{margin:14px 0 8px;font-size:16px}
+</style>
+</head>
+<body>
+<div id="bg"></div>
+<script>
+(function(){
+  function show(t){
+    var b=document.getElementById("errBox");
+    if(!b){b=document.createElement("pre");b.id="errBox";
+      b.style.cssText="position:fixed;left:0;right:0;top:0;z-index:99;margin:0;padding:8px;background:#7b1e1e;color:#fff;font-size:12px;white-space:pre-wrap";
+      document.body.appendChild(b);}
+    b.textContent+=t+"\n";
+  }
+  window.addEventListener("error",function(e){show("错误："+(e.message||"未知")+(e.lineno?" 行"+e.lineno:""));});
+  window.addEventListener("unhandledrejection",function(e){show("错误："+((e.reason&&e.reason.message)||e.reason));});
+})();
+</script>
+
+
+<div id="gate">
+  <div class="card">
+    <h2>匿名信</h2>
+    <p class="hint" id="libWait">正在加载组件…（如果这行一直不消失，说明组件没下载下来）</p>
+    <p class="hint" id="libErr" hidden style="color:#c0392b">无法加载必要组件，请检查网络；如果开着 VPN，换个节点或暂时关掉，再刷新页面。</p>
+    <p class="hint">为防止滥用，我们会记录访问的 IP 地址，仅用于封禁恶意刷信的行为。私信内容可能会被管理员审核。</p>
+    <div class="seg" id="segAuth"><button class="on" data-t="in">登录</button><button data-t="up">注册</button></div>
+    <input id="uName0" maxlength="16" placeholder="用户名（2到16位，中文字母数字下划线）" autocomplete="username">
+    <input id="uPass0" type="password" placeholder="密码（至少6位）" autocomplete="current-password">
+    <button class="btn" id="bAuth">登录</button>
+    <p class="hint" style="margin-top:10px">不需要邮箱。请牢记密码，忘记后无法找回。</p>
+  </div>
+</div>
+
+<div id="app">
+  <header><h1>匿名信</h1><div><button class="chip ghost" id="dm">私信</button> <button class="chip ghost" id="me">我</button></div></header>
+  <main>
+    <section id="v-home">
+      <div id="feed"></div>
+      <button class="btn ghost" id="more" hidden>加载更多</button>
+    </section>
+
+    <section id="v-pub" hidden>
+      <div class="seg" id="segPub"><button class="on" data-t="post">帖子</button><button data-t="anon">匿名信</button><button data-t="pub">公开信</button></div>
+      <div class="card" data-p="post">
+        <textarea id="pPost" rows="6" maxlength="1000" placeholder="说点什么，所有人可见"></textarea>
+        <button class="btn" id="bPost">发布帖子</button>
+      </div>
+      <div class="card" data-p="anon" hidden>
+        <p class="hint">只有知道数字码和密码的人才能取到这封信，请记好。</p>
+        <textarea id="pAnon" rows="6" maxlength="2000" placeholder="信的内容"></textarea>
+        <input id="aCode" inputmode="numeric" maxlength="12" placeholder="数字码（6到12位数字）">
+        <input id="aPass" inputmode="numeric" maxlength="4" placeholder="密码（最多4位数字）">
+        <button class="btn" id="bAnon">发布匿名信</button>
+      </div>
+      <div class="card" data-p="pub" hidden>
+        <p class="hint">对方搜索收信人名字，或你设的关键词，就能看到这封信。</p>
+        <input id="uName" maxlength="30" placeholder="收信人名字">
+        <input id="uKey" maxlength="30" placeholder="关键词（可不填）">
+        <textarea id="pPub" rows="6" maxlength="2000" placeholder="信的内容"></textarea>
+        <button class="btn" id="bPub">发布公开信</button>
+      </div>
+    </section>
+
+    <section id="v-find" hidden>
+      <div class="seg" id="segFind"><button class="on" data-t="anon">匿名信</button><button data-t="pub">公开信</button></div>
+      <div class="card" data-p="anon">
+        <input id="fCode" inputmode="numeric" maxlength="12" placeholder="数字码">
+        <input id="fPass" inputmode="numeric" maxlength="4" placeholder="密码">
+        <button class="btn" id="bRead">取信</button>
+        <div class="body" id="rOut"></div>
+      </div>
+      <div class="card" data-p="pub" hidden>
+        <input id="fQ" maxlength="30" placeholder="收信人名字或关键词">
+        <button class="btn" id="bSearch">搜索</button>
+      </div>
+      <div id="sOut" data-p="pub" hidden></div>
+    </section>
+  </main>
+  <nav>
+    <button data-v="pub">发布</button>
+    <button data-v="home" class="on">主页</button>
+    <button data-v="find">搜信</button>
+  </nav>
+</div>
+
+<div id="sheet" hidden>
+  <div class="card">
+    <p class="hint" id="who"></p>
+    <h3 style="margin-top:0">昵称</h3>
+    <input id="nick" maxlength="20">
+    <button class="btn" id="bNick">保存昵称</button>
+    <h3>外观</h3>
+    <button class="btn ghost" id="bTheme">切换日间 / 夜间</button>
+    <input type="file" id="bgFile" accept="image/*" style="margin-top:10px">
+    <button class="btn ghost" id="bBgDel">移除背景图</button>
+    <p class="hint">背景图只保存在这台设备的浏览器里。</p>
+    <h3>我发的匿名信</h3>
+    <div id="mine"></div>
+    <div id="adminBox" hidden>
+      <h3>管理</h3>
+      <button class="btn" id="bAdmin">查看被举报的内容</button>
+      <button class="btn ghost" id="bAdminChats" style="margin-top:8px">审核私信</button>
+      <div id="adminOut" style="margin-top:10px"></div>
+    </div>
+    <button class="btn ghost" id="bOut" style="margin-top:12px">退出登录</button>
+    <button class="btn ghost" id="bClose" style="margin-top:12px">关闭</button>
+  </div>
+</div>
+<div id="chat" hidden>
+  <div class="card">
+    <div class="meta" style="margin-bottom:8px"><strong id="chatTitle">私信</strong><button class="rep" id="chatBack" hidden>返回</button></div>
+    <p class="hint">提示：为防止违法内容，管理员可能会审核私信，请勿发送违法信息。</p>
+    <div id="chatList"></div>
+    <div id="chatMsgs" hidden>
+      <div id="msgs" style="max-height:50vh;overflow-y:auto"></div>
+      <textarea id="dmText" rows="2" maxlength="1000" placeholder="输入消息"></textarea>
+      <button class="btn" id="dmSend">发送</button>
+    </div>
+    <button class="btn ghost" id="chatClose" style="margin-top:12px">关闭</button>
+  </div>
+</div>
+<div id="toast" hidden></div>
+
+<script>
+(function(){
+  var p="/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js";
+  var urls=["https://cdn.jsdelivr.net"+p,"https://fastly.jsdelivr.net"+p,"https://gcore.jsdelivr.net"+p,"https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"];
+  var started=false;
+  function run(){
+    if(started)return; started=true; var w=document.getElementById("libWait"); if(w)w.hidden=true;
+    var s=document.createElement("script");
+    s.textContent=document.getElementById("main").textContent;
+    document.body.appendChild(s);
+  }
+  function fail(){
+    var w=document.getElementById("libWait"); if(w)w.hidden=true; var e=document.getElementById("libErr");
+    if(e){e.hidden=false;}
+  }
+  function next(i){
+    if(window.supabase) return run();
+    if(i>=urls.length) return fail();
+    var done=false, s=document.createElement("script");
+    function go(){ if(done)return; done=true; window.supabase?run():next(i+1); }
+    s.src=urls[i]; s.onload=go; s.onerror=go;
+    setTimeout(go,6000);
+    document.head.appendChild(s);
+  }
+  next(0);
+})();
+</script>
+<script type="text/plain" id="main">
+const SUPABASE_URL = "https://wqyghhbrvzqvspcvruql.supabase.co";
+const SUPABASE_KEY = "sb_publishable_wJnImK4HELANkdrJs3OMEg_PA7psgpZ";
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { lock: async (name, timeout, fn) => await fn() }
+});
+const $ = (id) => document.getElementById(id);
+const store = {
+  get(k){ try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v){ try { localStorage.setItem(k, v); return true; } catch { return false; } },
+  del(k){ try { localStorage.removeItem(k); } catch {} }
+};
+const ERR = {
+  "code taken": "这个数字码已被用过，换一个",
+  "too many requests": "操作太频繁，请稍后再试",
+  "banned": "你的账号或网络已被限制",
+  "invalid code or password": "数字码需 6 到 12 位数字，密码需 1 到 4 位数字",
+  "not logged in": "还没有登录成功，请刷新页面",
+  "Invalid login credentials": "用户名或密码不对",
+  "already registered": "这个用户名已被注册",
+  "username taken": "这个用户名已被注册",
+  "invalid username": "用户名需 2 到 16 位，只能是中文、字母、数字、下划线",
+  "forbidden": "没有权限",
+  "chat banned": "你已被禁止发送私信",
+  "cannot message yourself": "不能给自己发私信",
+  "not found": "找不到这条帖子"
+};
+const msgOf = (e) => { const m = (e && e.message) || ""; for (const k in ERR) if (m.includes(k)) return ERR[k]; return "出错了：" + m; };
+let tt;
+function toast(msg){ const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 3000); }
+async function rpc(name, args){ const { data, error } = await db.rpc(name, args); if (error) throw error; return data; }
+function run(btn, fn){ btn.onclick = async () => { btn.disabled = true; try { await fn(); } catch (e) { toast(msgOf(e)); } btn.disabled = false; }; }
+function el(tag, cls, text){ const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+const fmt = (s) => new Date(s).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+
+function applyTheme(t){ document.documentElement.dataset.theme = t; store.set("theme", t); }
+applyTheme(store.get("theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+function applyBg(){ const b = store.get("bg"); $("bg").style.backgroundImage = b ? "url(" + b + ")" : "none"; }
+applyBg();
+
+function tabs(box, root){
+  box.querySelectorAll("button").forEach((b) => b.onclick = () => {
+    box.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+    root.querySelectorAll("[data-p]").forEach((p) => p.hidden = p.dataset.p !== b.dataset.t);
+  });
+}
+tabs($("segPub"), $("v-pub"));
+tabs($("segFind"), $("v-find"));
+
+function show(v){
+  ["home", "pub", "find"].forEach((n) => $("v-" + n).hidden = n !== v);
+  document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
+}
+document.querySelectorAll("nav button").forEach((b) => b.onclick = () => { show(b.dataset.v); if (b.dataset.v === "home") loadPosts(true); });
+
+function report(type, id){
+  if (!confirm("确定举报这条内容吗？")) return;
+  rpc("report_content", { p_type: type, p_id: id }).then(() => toast("已举报")).catch((e) => toast(msgOf(e)));
+}
+
+let before = null;
+async function loadPosts(reset){
+  if (reset){ $("feed").textContent = ""; before = null; }
+  try {
+    const rows = await rpc("list_posts", { p_limit: 20, p_before: before });
+    rows.forEach((r) => {
+      const c = el("div", "card");
+      const m = el("div", "meta");
+      m.append(el("span", "", r.nickname + (r.mine ? "（我）" : "")), el("span", "", fmt(r.created_at)));
+      const rep = el("button", "rep", "举报"); rep.onclick = () => report("post", r.id);
+      c.append(m, el("div", "body", r.content), rep);
+      if (!r.mine) {
+        const dm = el("button", "rep", "　私信");
+        dm.onclick = async () => {
+          try { openChat(await rpc("start_dm", { p_post_id: r.id }), r.nickname); } catch (e) { toast(msgOf(e)); }
+        };
+        c.append(dm);
+      }
+      if (r.mine || isAdmin) {
+        const del = el("button", "rep", "　删除");
+        del.onclick = () => {
+          if (!confirm("确定删除这条帖子吗？")) return;
+          rpc(r.mine ? "delete_my_post" : "admin_delete", r.mine ? { p_id: r.id } : { p_type: "post", p_id: r.id })
+            .then(() => c.remove()).catch((e) => toast(msgOf(e)));
+        };
+        c.append(del);
+      }
+      $("feed").append(c);
+      before = r.created_at;
+    });
+    $("more").hidden = rows.length < 20;
+    if (reset && !rows.length) $("feed").append(el("p", "hint", "还没有帖子，去发布第一条吧。"));
+  } catch (e) { toast(msgOf(e)); }
+}
+$("more").onclick = () => loadPosts(false);
+
+run($("bPost"), async () => {
+  await rpc("create_post", { p_content: $("pPost").value });
+  $("pPost").value = ""; toast("发布成功"); show("home"); loadPosts(true);
+});
+run($("bAnon"), async () => {
+  await rpc("send_letter", { p_code: $("aCode").value.trim(), p_pass: $("aPass").value.trim(), p_content: $("pAnon").value.trim() });
+  $("pAnon").value = $("aCode").value = $("aPass").value = ""; toast("匿名信已发布，请记好数字码和密码");
+});
+run($("bPub"), async () => {
+  await rpc("send_public_letter", { p_to_name: $("uName").value, p_keyword: $("uKey").value, p_content: $("pPub").value });
+  $("pPub").value = $("uName").value = $("uKey").value = ""; toast("公开信已发布");
+});
+run($("bRead"), async () => {
+  const t = await rpc("read_letter", { p_code: $("fCode").value.trim(), p_pass: $("fPass").value.trim() });
+  $("rOut").textContent = t || "数字码或密码不对，没找到信。";
+});
+run($("bSearch"), async () => {
+  const rows = await rpc("search_public_letters", { p_query: $("fQ").value });
+  const box = $("sOut"); box.textContent = "";
+  if (!rows.length) box.append(el("p", "hint", "没有找到相关的公开信。"));
+  rows.forEach((r) => {
+    const c = el("div", "card");
+    const m = el("div", "meta"); m.append(el("span", "", "致 " + r.to_name), el("span", "", fmt(r.created_at)));
+    const rep = el("button", "rep", "举报"); rep.onclick = () => report("public_letter", r.id);
+    c.append(m, el("div", "body", r.content), rep); box.append(c);
+  });
+});
+
+async function openSheet(){
+  $("sheet").hidden = false;
+  const box = $("mine"); box.textContent = "";
+  const { data, error } = await db.from("letters").select("code,content,created_at").order("created_at", { ascending: false });
+  if (error || !data.length){ box.append(el("p", "hint", error ? msgOf(error) : "还没有发过匿名信。")); return; }
+  data.forEach((r) => {
+    const c = el("div", "card");
+    const m = el("div", "meta"); m.append(el("span", "", "数字码 " + r.code), el("span", "", fmt(r.created_at)));
+    c.append(m, el("div", "body", r.content)); box.append(c);
+  });
+}
+$("me").onclick = openSheet;
+$("bClose").onclick = () => $("sheet").hidden = true;
+run($("bNick"), async () => { await rpc("set_nickname", { p_name: $("nick").value }); toast("昵称已保存"); });
+$("bTheme").onclick = () => {
+  const t = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  applyTheme(t); rpc("set_theme", { p_theme: t }).catch(() => {});
+};
+$("bBgDel").onclick = () => { store.del("bg"); applyBg(); toast("已移除背景图"); };
+$("bgFile").onchange = (ev) => {
+  const f = ev.target.files[0]; if (!f) return;
+  const img = new Image();
+  img.onload = () => {
+    const s = Math.min(1, 1280 / Math.max(img.width, img.height));
+    const cv = document.createElement("canvas");
+    cv.width = img.width * s; cv.height = img.height * s;
+    cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+    if (store.set("bg", cv.toDataURL("image/jpeg", 0.7))){ applyBg(); toast("背景图已设置"); } else toast("图片太大，保存失败");
+  };
+  img.src = URL.createObjectURL(f);
+};
+
+const timeout = (p, ms) => Promise.race([p, new Promise((_, r) => setTimeout(() => r(new Error("连接超时，请检查网络或 VPN")), ms))]);
+
+// 用户名不是真邮箱：把它变成一个看不见的假邮箱交给 Supabase。若注册提示邮箱无效，改这个后缀。
+const FAKE_DOMAIN = "gmail.com";
+async function fakeEmail(name){
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("letters:" + name.trim().toLowerCase()));
+  const hex = [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return "u" + hex.slice(0, 40) + "@" + FAKE_DOMAIN;
+}
+
+let mode = "in", isAdmin = false;
+document.querySelectorAll("#segAuth button").forEach((b) => b.onclick = () => {
+  mode = b.dataset.t;
+  document.querySelectorAll("#segAuth button").forEach((x) => x.classList.toggle("on", x === b));
+  $("bAuth").textContent = mode === "in" ? "登录" : "注册并进入";
+});
+
+async function enter(){
+  const p = (await rpc("me"))[0];
+  isAdmin = p.admin;
+  $("who").textContent = "账号：" + (p.username || "（旧账号）");
+  $("nick").value = p.nickname; applyTheme(p.theme);
+  $("adminBox").hidden = !isAdmin;
+  $("gate").hidden = true; loadPosts(true);
+}
+
+run($("bAuth"), async () => {
+  const name = $("uName0").value.trim(), pass = $("uPass0").value;
+  if (!/^[A-Za-z0-9_\u4e00-\u9fa5]{2,16}$/.test(name)) throw new Error("invalid username");
+  if (pass.length < 6) throw new Error("密码至少 6 位");
+  const email = await fakeEmail(name);
+  if (mode === "up"){
+    const { error } = await timeout(db.auth.signUp({ email, password: pass }), 10000);
+    if (error) throw error;
+    await rpc("register_profile", { p_username: name });
+  } else {
+    const { error } = await timeout(db.auth.signInWithPassword({ email, password: pass }), 10000);
+    if (error) throw error;
+  }
+  await enter();
+});
+
+$("bOut").onclick = async () => { await db.auth.signOut(); location.reload(); };
+
+run($("bAdmin"), async () => {
+  const rows = await rpc("admin_reports");
+  const box = $("adminOut"); box.textContent = "";
+  if (!rows.length) box.append(el("p", "hint", "没有被举报的内容。"));
+  rows.forEach((r) => {
+    const c = el("div", "card");
+    const m = el("div", "meta");
+    m.append(el("span", "", (r.target_type === "post" ? "帖子" : "公开信") + " · " + r.cnt + " 人举报"), el("span", "", r.hidden ? "已隐藏" : "显示中"));
+    c.append(m, el("div", "body", r.content || "（已删除）"));
+    const row = el("div"); row.style.cssText = "display:flex;gap:6px;flex-wrap:wrap";
+    const mk = (t, fn) => {
+      const b = el("button", "chip ghost", t);
+      b.onclick = async () => { try { await fn(); toast("已完成"); } catch (e) { toast(msgOf(e)); } };
+      return b;
+    };
+    row.append(
+      mk(r.hidden ? "取消隐藏" : "隐藏", () => rpc("admin_set_hidden", { p_type: r.target_type, p_id: r.target_id, p_hidden: !r.hidden })),
+      mk("删除", () => rpc("admin_delete", { p_type: r.target_type, p_id: r.target_id }).then(() => c.remove())),
+   
