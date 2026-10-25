@@ -165,33 +165,7 @@ h3{margin:14px 0 8px;font-size:16px}
 <div id="toast" hidden></div>
 
 <script>
-(function(){
-  var p="/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js";
-  var urls=["https://cdn.jsdelivr.net"+p,"https://fastly.jsdelivr.net"+p,"https://gcore.jsdelivr.net"+p,"https://unpkg.com/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"];
-  var started=false;
-  function run(){
-    if(started)return; started=true; var w=document.getElementById("libWait"); if(w)w.hidden=true;
-    var s=document.createElement("script");
-    s.textContent=document.getElementById("main").textContent;
-    document.body.appendChild(s);
-  }
-  function fail(){
-    var w=document.getElementById("libWait"); if(w)w.hidden=true; var e=document.getElementById("libErr");
-    if(e){e.hidden=false;}
-  }
-  function next(i){
-    if(window.supabase) return run();
-    if(i>=urls.length) return fail();
-    var done=false, s=document.createElement("script");
-    function go(){ if(done)return; done=true; window.supabase?run():next(i+1); }
-    s.src=urls[i]; s.onload=go; s.onerror=go;
-    setTimeout(go,6000);
-    document.head.appendChild(s);
-  }
-  next(0);
-})();
-</script>
-<script type="text/plain" id="main">
+function main(){
 const SUPABASE_URL = "https://wqyghhbrvzqvspcvruql.supabase.co";
 const SUPABASE_KEY = "sb_publishable_wJnImK4HELANkdrJs3OMEg_PA7psgpZ";
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
@@ -409,4 +383,29 @@ run($("bAdmin"), async () => {
     row.append(
       mk(r.hidden ? "取消隐藏" : "隐藏", () => rpc("admin_set_hidden", { p_type: r.target_type, p_id: r.target_id, p_hidden: !r.hidden })),
       mk("删除", () => rpc("admin_delete", { p_type: r.target_type, p_id: r.target_id }).then(() => c.remove())),
-   
+      mk("封号", () => rpc("admin_ban", { p_user: r.author_id, p_with_ip: false })),
+      mk("封号+IP", () => rpc("admin_ban", { p_user: r.author_id, p_with_ip: true }))
+    );
+    c.append(row); box.append(c);
+  });
+});
+
+let curConv = null;
+function chatView(list){ $("chatList").hidden = !list; $("chatMsgs").hidden = list; $("chatBack").hidden = list; }
+async function openInbox(){
+  $("chat").hidden = false; $("chatTitle").textContent = "私信"; chatView(true);
+  const box = $("chatList"); box.textContent = "";
+  try {
+    const rows = await rpc("my_conversations");
+    if (!rows.length) box.append(el("p", "hint", "还没有私信。在主页帖子下点“私信”就能开始聊天。"));
+    rows.forEach((r) => {
+      const c = el("div", "card"); c.style.cursor = "pointer";
+      const m = el("div", "meta");
+      m.append(el("strong", "", r.peer), el("span", "", r.unread > 0 ? r.unread + " 条未读" : (r.last_at ? fmt(r.last_at) : "")));
+      c.append(m, el("div", "body", r.last_msg || "（还没有消息）"));
+      c.onclick = () => openChat(r.conv_id, r.peer);
+      box.append(c);
+    });
+  } catch (e) { toast(msgOf(e)); }
+}
+async function
